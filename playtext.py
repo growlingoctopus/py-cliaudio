@@ -25,7 +25,6 @@ for flvl in [0, 1, 2, 3]:
     for fbase in NOTE_FREQS4.keys():
         newlvl = fbase + str(flvl)
         NOTE_FREQS[newlvl] = NOTE_FREQS4[fbase] / (2 ** (4 - flvl))
-        print(f"flvl: {flvl}, fbase {fbase}, newlvl {newlvl}, freq {NOTE_FREQS.get(newlvl)}")
 for fbase in NOTE_FREQS4.keys():
     NOTE_FREQS[fbase+'4'] = NOTE_FREQS4[fbase]
 for flvl in [5, 6, 7, 8]:
@@ -155,6 +154,7 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
     block_repeat_buffer = []
     restok = False
     restok_buffer = []
+    skip_tokens = False
     staccato = 1
     for token in note_tokens:
         wave_override = wave_type
@@ -163,6 +163,15 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
         
         if token.startswith('|'):
             continue # visual bar splitter for making the command easier to read if you want
+        elif token == 'skip':
+            skip_tokens = True
+            continue
+        elif token == 'noskip':
+            skip_tokens = False
+            continue
+
+        if skip_tokens:
+            continue
 
         if token == 'repeat':
             block_repeat = True
@@ -179,13 +188,6 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
         if ':' not in token:
             continue
 
-        if '+' in token:
-            (token, dB_adjust) = token.split('+')
-            dB_adjust = float(dB_adjust)
-        elif '-' in token:
-            (token, dB_adjust) = token.split('-')
-            dB_adjust = -float(dB_adjust)
-        wave_multiplier = .5 * ( 10**((dB_adjust+dB_base)/20) )
 
         if token.find('(') >= 0 and token.find('x)') > token.find('('):
             (tok_head, tok_tail) = token.split('(')
@@ -200,11 +202,25 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
 
         tksplit = token.split(':')
 
-        # ANY STUFF THAT USES : SPLITS BELOW THIS
+        # ANY STUFF THAT USES : SPLITS BUT BEFORE NOTE PARSE BELOW THIS
         if tksplit[0] == 'staccato':
             if tksplit[1].isdigit():
                 staccato = max(1, int(tksplit[1]))
             continue
+        elif tksplit[0] == 'gain':
+            gain = int(tksplit[1])
+            if gain:
+                dB_base = gain
+            continue
+
+        if '+' in tksplit[-1]:
+            (tksplit[-1], dB_adjust) = tksplit[-1].split('+')
+            dB_adjust = float(dB_adjust)
+        elif '-' in token:
+            (tksplit[-1], dB_adjust) = tksplit[-1].split('-')
+            dB_adjust = -float(dB_adjust)
+        wave_multiplier = .5 * ( 10**((dB_adjust+dB_base)/20) )
+        # END STUFF AFTER : SPLIT BUT BEFORE NOTE PROCESSING
 
         if len(tksplit) == 3 and tksplit[2] in ACCEPTED_WAVE_TYPES:
             wave_override = tksplit[2]
@@ -236,7 +252,6 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
         if note_part[1] in ['b', '#']:
             sharpflat = note_part[1]
             note_part = note_part[0] + note_part[2:]
-            print(f"stripped sharpflat {sharpflat} from {note_part}")
         if len(note_part) == 1:
             root_note = note_part
             chord_type = ""
@@ -254,19 +269,17 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
         if sharpflat:
             root_note = root_note[0] + sharpflat + root_note[1:]
 
-        print(f"Parsing root note {root_note} => {chord_type} (from token {token})")
         if root_note in NOTE_FREQS:
-            print(f"note {root_note} in note freqs")
             base_freq = NOTE_FREQS[root_note]
             if chord_type:
                 target_freqs = [base_freq * interval for interval in CHORD_INTERVALS[chord_type]]
             else:
-                print(f"note {root_note} frequency is {base_freq}")
                 target_freqs = [base_freq]
         else:
             print(f"Warning: Unknown note/chord '{note_part}'")
             target_freqs = []
 
+        print(f"TOKEN {token}: note {root_note} frequency is {base_freq}")
         chunk = generate_step(target_freqs, duration_beats, bpm, wave_override, staccato)
         chunk *= wave_multiplier
 
@@ -276,7 +289,6 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
         else:
             for i in range(repeat_count):
                 full_song_buffer.append(chunk)
-                print(f"full buffer is now {len(full_song_buffer)} in size ()")
     if block_repeat and len(block_repeat_buffer) > 0:
         full_song_buffer.append(block_repeat_buffer)
     return np.concatenate(full_song_buffer) if full_song_buffer else np.array([])
