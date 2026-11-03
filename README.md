@@ -35,6 +35,21 @@ Rests can be added the same way as notes.  Just do rest:note length or r:note le
 ## Multiple Tracks
 You can specify multiple 'tracks' in separated quoted note sequences.  BPM specified from any track other than the first will be ignored, and is not required to even use.  For example, `python3 playtext.py '120/sawtooth C4maj7:1/8(x8) F4pow:1/8(x4) G4maj7(x4)' 'organ C2:4 Eb:4 F2:4 G2maj:4'
 
+# Changing gain mid track
+Instead of setting the gain for a specific note, you can also just use a token like 'gain:+5' or 'gain:-10' and it will change it from then on (until you change it back with another command).
+
+# Comments/bars
+Any token in a track that starts with | is ignored, so it can be used to split up measures and make reading easier.  You can use it for comments (without spaces) if needed too, for example '|verse2'
+
+# Skip command for testing
+If you want to just ignore a part of the track during testing, you can put a token that's just 'skip' and it will skip everything after it until a 'noskip' command.
+For example, `python3 playtext.py '160/triangle C4:1 D4:1 skip E4:1 F4:1 G4:1 noskip A4:1 B4:1' will only play C4:1 D4:1 A4:1 B4:1.
+
+# tuning
+A4_BASE is set to 440 in the top of the script.  It can be changed to tune to something else like A=432.
+
+# staccato
+Setting a higher staccato value increases the fade-out on notes to act more like staccato notes.  The default is 1 (whole numbers).  There's no capped limit, but it will stop working if the number is too high, so experimenting is wise.  Simply add a token like staccato:5 and it will affect all tokens afterwards, until you change it again.
 
 ## Examples
 Highly professional masterpiece, Hot Cross Buns .. it even almost sounds like a recorder:
