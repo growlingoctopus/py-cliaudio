@@ -293,7 +293,7 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
             print(f"Warning: Unknown note/chord '{note_part}'")
             target_freqs = []
 
-        print(f"TOKEN {token}: note {root_note} frequency is {base_freq}")
+        #print(f"TOKEN {token}: note {root_note} frequency is {base_freq}")
         chunk = generate_step(target_freqs, duration_beats, bpm, wave_override, staccato)
         chunk *= wave_multiplier
 
