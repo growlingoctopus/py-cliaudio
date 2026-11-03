@@ -10,15 +10,29 @@ ACCEPTED_WAVE_TYPES = ['sine', 'square', 'triangle', 'sawtooth', 'pulse','organ'
 SEMITONE_MULTIPLIERS = [2 ** (x / 12.0) for x in range(24)]
 DEFAULT_OCTAVE = "3"
 PULSE_WIDTH = .25
+A4_BASE = 440.0
 
-# Standard frequency definitions for Octave 4
+C4_BASE = A4_BASE * (2**-.75)
 NOTE_FREQS4 = {
-    'C':  261.63, 'C#': 277.18, 'Db': 277.18, 'D':  293.66, 
-    'D#': 311.13, 'Eb': 311.13, 'E':  329.63, 'F':  349.23, 
-    'F#': 369.99, 'Gb': 369.99, 'G':  392.00, 'G#': 415.30,
-    'Ab': 415.30, 'A':  440.00, 'A#': 466.16, 'Bb': 466.16,
-    'B':  493.88
+    'C':  C4_BASE,
+    'C#': C4_BASE * (2**(1/12)),
+    'Db': C4_BASE * (2**(1/12)),
+    'D':  C4_BASE * (2**(2/12)),
+    'D#': C4_BASE * (2**(3/12)),
+    'Eb': C4_BASE * (2**(3/12)),
+    'E':  C4_BASE * (2**(4/12)),
+    'F':  C4_BASE * (2**(5/12)),
+    'F#': C4_BASE * (2**(6/12)),
+    'Gb': C4_BASE * (2**(6/12)),
+    'G':  C4_BASE * (2**(7/12)),
+    'G#': C4_BASE * (2**(8/12)),
+    'Ab': C4_BASE * (2**(8/12)),
+    'A':  C4_BASE * (2**(9/12)),
+    'A#': C4_BASE * (2**(10/12)),
+    'Bb': C4_BASE * (2**(10/12)),
+    'B':  C4_BASE * (2**(11/12)),
 }
+
 NOTE_FREQS = {}
 # yes i know you shouldnt do this to constants, fuck you if you complain
 for flvl in [0, 1, 2, 3]:
