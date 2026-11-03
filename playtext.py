@@ -13,9 +13,11 @@ PULSE_WIDTH = .25
 
 # Standard frequency definitions for Octave 4
 NOTE_FREQS4 = {
-    'C': 261.63, 'C#': 277.18, 'D': 293.66, 'D#': 311.13, 
-    'E': 329.63, 'F': 349.23, 'F#': 369.99, 'G': 392.00, 
-    'G#': 415.30, 'A': 440.00, 'A#': 466.16, 'B': 493.88
+    'C':  261.63, 'C#': 277.18, 'Db': 277.18, 'D':  293.66, 
+    'D#': 311.13, 'Eb': 311.13, 'E':  329.63, 'F':  349.23, 
+    'F#': 369.99, 'Gb': 369.99, 'G':  392.00, 'G#': 415.30,
+    'Ab': 415.30, 'A':  440.00, 'A#': 466.16, 'Bb': 466.16,
+    'B':  493.88
 }
 NOTE_FREQS = {}
 # yes i know you shouldnt do this to constants, fuck you if you complain
@@ -23,6 +25,7 @@ for flvl in [0, 1, 2, 3]:
     for fbase in NOTE_FREQS4.keys():
         newlvl = fbase + str(flvl)
         NOTE_FREQS[newlvl] = NOTE_FREQS4[fbase] / (2 ** (4 - flvl))
+        print(f"flvl: {flvl}, fbase {fbase}, newlvl {newlvl}, freq {NOTE_FREQS.get(newlvl)}")
 for fbase in NOTE_FREQS4.keys():
     NOTE_FREQS[fbase+'4'] = NOTE_FREQS4[fbase]
 for flvl in [5, 6, 7, 8]:
@@ -80,7 +83,7 @@ def get_wave(phase, wave_type):
     
     return np.zeros_like(phase)
 
-def generate_step(frequencies, duration_beats, bpm, wave_type):
+def generate_step(frequencies, duration_beats, bpm, wave_type,staccato=4):
     samples_per_beat = (60.0 / bpm) * SAMPLE_RATE
     total_samples = int(duration_beats * samples_per_beat)
     
@@ -100,12 +103,12 @@ def generate_step(frequencies, duration_beats, bpm, wave_type):
 
     # 10ms anti-pop envelope
     fade_samples = int(0.010 * SAMPLE_RATE)
-    if fade_samples * 2 < total_samples:
+    if fade_samples * (2 + staccato) < total_samples:
         fade_in = np.linspace(0.0, 1.0, fade_samples)
-        fade_out = np.linspace(1.0, 0.0, fade_samples)
+        fade_out = np.linspace(1.0, 0.0, fade_samples * staccato)
         envelope = np.ones(total_samples)
         envelope[:fade_samples] = fade_in
-        envelope[-fade_samples:] = fade_out
+        envelope[-fade_samples * staccato:] = fade_out
         mixed_wave *= envelope
 
     return mixed_wave
@@ -150,12 +153,16 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
 
     block_repeat = False
     block_repeat_buffer = []
-
+    restok = False
+    restok_buffer = []
+    staccato = 1
     for token in note_tokens:
         wave_override = wave_type
         dB_adjust = 0
         repeat_count = 1
         
+        if token.startswith('|'):
+            continue # visual bar splitter for making the command easier to read if you want
 
         if token == 'repeat':
             block_repeat = True
@@ -167,6 +174,8 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
                         full_song_buffer.append(block_repeat_buffer[j])
             block_repeat = False
             block_repeat_buffer = []
+
+        # ANYTHING WITHOUT A : GOES ABOVE THIS
         if ':' not in token:
             continue
 
@@ -185,7 +194,18 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
             if repeat_count.isdigit():
                 repeat_count = int(repeat_count)
 
+        if token.endswith('..'):
+            token = token[:-2]
+            restok = True
+
         tksplit = token.split(':')
+
+        # ANY STUFF THAT USES : SPLITS BELOW THIS
+        if tksplit[0] == 'staccato':
+            if tksplit[1].isdigit():
+                staccato = max(1, int(tksplit[1]))
+            continue
+
         if len(tksplit) == 3 and tksplit[2] in ACCEPTED_WAVE_TYPES:
             wave_override = tksplit[2]
         note_part = tksplit[0]
@@ -211,12 +231,15 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
                 full_song_buffer.append(chunk)
             continue
 
+        # START BASIC NOTE PARSING
+        sharpflat = ""
+        if note_part[1] in ['b', '#']:
+            sharpflat = note_part[1]
+            note_part = note_part[0] + note_part[2:]
+            print(f"stripped sharpflat {sharpflat} from {note_part}")
         if len(note_part) == 1:
             root_note = note_part
             chord_type = ""
-        elif note_part[1] in ['b', '#']:
-            root_note = note_part[:3]
-            chord_type = note_part[3:]
         elif note_part[1].isdigit():
             root_note = note_part[:2]
             chord_type = note_part[2:]
@@ -228,18 +251,25 @@ def parse_and_render(sequence_string, wave_type, bypass_bpm=0):
         else:
             print(f"Warning: Unknown note/chord part '{note_part}'")
 
+        if sharpflat:
+            root_note = root_note[0] + sharpflat + root_note[1:]
+
+        print(f"Parsing root note {root_note} => {chord_type} (from token {token})")
         if root_note in NOTE_FREQS:
+            print(f"note {root_note} in note freqs")
             base_freq = NOTE_FREQS[root_note]
             if chord_type:
                 target_freqs = [base_freq * interval for interval in CHORD_INTERVALS[chord_type]]
             else:
+                print(f"note {root_note} frequency is {base_freq}")
                 target_freqs = [base_freq]
         else:
             print(f"Warning: Unknown note/chord '{note_part}'")
             target_freqs = []
 
-        chunk = generate_step(target_freqs, duration_beats, bpm, wave_override)
+        chunk = generate_step(target_freqs, duration_beats, bpm, wave_override, staccato)
         chunk *= wave_multiplier
+
         if block_repeat:
             for i in range(repeat_count):
                 block_repeat_buffer.append(chunk)
